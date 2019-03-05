@@ -1,5 +1,6 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
+#include "Engine/World.h"
 #include "TankPlayerController.h"
 
 #define OUT
@@ -11,7 +12,6 @@ void ATankPlayerController::Tick(float DeltaTime)
 	AimTowardsCrosshair();
 }
 	
-
 void ATankPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -35,29 +35,30 @@ void ATankPlayerController::AimTowardsCrosshair()
 {
 	if (!GetControlledTank()) { return; }
 
-	FVector HitLocation; // OUT
+	FVector HitLocation; // OUT parameter
 	if (GetSightRayHitLocation(HitLocation))
 	{
 		// Tell controlled tank to aim at this point
+		UE_LOG(LogTemp, Warning, TEXT("Hit: %s"), *HitLocation.ToString());
 	}
 }
 
-// Get world location of linetrace through crosshair
+// Get world location of linetrace through the crosshair
 bool ATankPlayerController::GetSightRayHitLocation(FVector& OutHitLocation) const
 {
 	// Find crosshair position
 	int32 ViewportSizeX, ViewportSizeY;
+
 	GetViewportSize(ViewportSizeX, ViewportSizeY);
+
 	FVector2D ScreenLocation(ViewportSizeX * CrosshairXLocation,
 		ViewportSizeY * CrosshairYLocation);
 	
 	FVector LookDirection;
 	if (GetLookDirection(ScreenLocation, LookDirection))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Look Direction: %s"), *LookDirection.ToString());
+		GetLookVectorHitLocation(LookDirection, OutHitLocation);
 	}
-	// Linetrace along that direction to see what we hit
-	
 	return true;
 }
 
@@ -70,5 +71,25 @@ bool ATankPlayerController::GetLookDirection(FVector2D ScreenLocation, FVector& 
 		ScreenLocation.Y,
 		CameraWorldPosition,
 		LookDirection);
+}
 
+// Linetrace along look direction to see what we hit
+bool ATankPlayerController::GetLookVectorHitLocation(FVector LookDirection, FVector& HitLocation) const
+{
+	FHitResult HitResult;
+	auto StartLocation = PlayerCameraManager->GetCameraLocation();
+	auto EndLocation = StartLocation + (LookDirection * LineTraceRange);
+
+	if (GetWorld()->LineTraceSingleByChannel(
+		HitResult,
+		StartLocation,
+		EndLocation,
+		ECollisionChannel::ECC_Visibility
+	))
+	{
+		HitLocation = HitResult.Location;
+		return true;
+	}
+	HitLocation = FVector(0, 0, 0);
+	return false;
 }
